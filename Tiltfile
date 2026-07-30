@@ -42,6 +42,32 @@ k8s_resource('api-gateway', port_forwards=8081,
              resource_deps=['api-gateway-compile'], labels="services")
 ### End of API Gateway ###
 
+### CloudNativePG Operator ###
+load('ext://helm_remote', 'helm_remote')
+
+helm_remote(
+  'cloudnative-pg',
+  repo_name='cnpg',
+  repo_url='https://cloudnative-pg.github.io/charts',
+  namespace='cnpg-system',
+  create_namespace=True,
+  version='0.29.0',
+  set=[
+    'webhook.mutating.failurePolicy=Ignore',
+    'webhook.validating.failurePolicy=Ignore',
+  ]
+)
+### End of CloudNativePG Operator ###
+
+### Postgres (oms-db) ###
+k8s_yaml('./infra/development/k8s/postgres.yaml')
+k8s_resource(
+  new_name='oms-db',
+  objects=['oms-db:cluster'],       
+  resource_deps=['cloudnative-pg'],      
+)
+### End of Postgres ###
+
 ### Trip Service ###
 
 #trip_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/trip-service ./services/trip-service/cmd/main.go'
