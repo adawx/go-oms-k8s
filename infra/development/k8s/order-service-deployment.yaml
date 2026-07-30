@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+        - name: order-service
+          image: go-oms/order-service
+          ports:
+            - containerPort: 8085
+          resources:
+            requests:
+              memory: '64Mi'
+              cpu: '100m'
+            limits:
+              memory: '128Mi'
+              cpu: '200m'
+          env:
+            # DB_HOST points at the CNPG read/write Service (the primary).
+            - name: DB_HOST
+              value: oms-db-rw
+            - name: DB_PORT
+              value: '5432'
+            # Credentials come from the secret CNPG auto-generated for the app user.
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: oms-db-app
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: oms-db-app
+                  key: password
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: oms-db-app
+                  key: dbname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+spec:
+  selector:
+    app: order-service
+  ports:
+    - port: 8085
+      name: http
+      targetPort: 8085
+  type: ClusterIP
