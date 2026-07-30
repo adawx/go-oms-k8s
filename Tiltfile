@@ -1,129 +1,74 @@
-# Welcome to Tilt!
-#   To get you started as quickly as possible, we have created a
-#   starter Tiltfile for you.
-#
-#   Uncomment, modify, and delete any commands as needed for your
-#   project's configuration.
+# Load the restart_process extension
+load('ext://restart_process', 'docker_build_with_restart')
+
+### K8s Config ###
+
+# Uncomment to use secrets
+# k8s_yaml('./infra/development/k8s/secrets.yaml')
+
+k8s_yaml('./infra/development/k8s/app-config.yaml')
+
+### End of K8s Config ###
+
+### API Gateway ###
+
+gateway_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/api-gateway ./services/api-gateway'
+if os.name == 'nt':
+  gateway_compile_cmd = './infra/development/docker/api-gateway-build.bat'
+
+local_resource(
+  'api-gateway-compile',
+  gateway_compile_cmd,
+  deps=['./services/api-gateway', './shared'], labels="compiles")
 
 
-# Output diagnostic messages
-#   You can print log messages, warnings, and fatal errors, which will
-#   appear in the (Tiltfile) resource in the web UI. Tiltfiles support
-#   multiline strings and common string operations such as formatting.
-#
-#   More info: https://docs.tilt.dev/api.html#api.warn
-print("""
------------------------------------------------------------------
-✨ Hello Tilt! This appears in the (Tiltfile) pane whenever Tilt
-   evaluates this file.
------------------------------------------------------------------
-""".strip())
-warn('ℹ️ Open {tiltfile_path} in your favorite editor to get started.'.format(
-    tiltfile_path=config.main_path))
+docker_build_with_restart(
+  'ride-sharing/api-gateway',
+  '.',
+  entrypoint=['/app/build/api-gateway'],
+  dockerfile='./infra/development/docker/api-gateway.Dockerfile',
+  only=[
+    './build/api-gateway',
+    './shared',
+  ],
+  live_update=[
+    sync('./build', '/app/build'),
+    sync('./shared', '/app/shared'),
+  ],
+)
 
+k8s_yaml('./infra/development/k8s/api-gateway-deployment.yaml')
+k8s_resource('api-gateway', port_forwards=8081,
+             resource_deps=['api-gateway-compile'], labels="services")
+### End of API Gateway ###
 
-# Build Docker image
-#   Tilt will automatically associate image builds with the resource(s)
-#   that reference them (e.g. via Kubernetes or Docker Compose YAML).
-#
-#   More info: https://docs.tilt.dev/api.html#api.docker_build
-#
-# docker_build('registry.example.com/my-image',
-#              context='.',
-#              # (Optional) Use a custom Dockerfile path
-#              dockerfile='./deploy/app.dockerfile',
-#              # (Optional) Filter the paths used in the build
-#              only=['./app'],
-#              # (Recommended) Updating a running container in-place
-#              # https://docs.tilt.dev/live_update_reference.html
-#              live_update=[
-#                 # Sync files from host to container
-#                 sync('./app', '/src/'),
-#                 # Execute commands inside the container when certain
-#                 # paths change
-#                 run('/src/codegen.sh', trigger=['./app/api'])
-#              ]
+### Trip Service ###
+
+#trip_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/trip-service ./services/trip-service/cmd/main.go'
+#if os.name == 'nt':
+#  trip_compile_cmd = './infra/development/docker/trip-build.bat'
+
+# local_resource(
+#   'trip-service-compile',
+#   trip_compile_cmd,
+#   deps=['./services/trip-service', './shared'], labels="compiles")
+
+# docker_build_with_restart(
+#   'ride-sharing/trip-service',
+#   '.',
+#   entrypoint=['/app/build/trip-service'],
+#   dockerfile='./infra/development/docker/trip-service.Dockerfile',
+#   only=[
+#     './build/trip-service',
+#     './shared',
+#   ],
+#   live_update=[
+#     sync('./build', '/app/build'),
+#     sync('./shared', '/app/shared'),
+#   ],
 # )
 
-
-# Apply Kubernetes manifests
-#   Tilt will build & push any necessary images, re-deploying your
-#   resources as they change.
-#
-#   More info: https://docs.tilt.dev/api.html#api.k8s_yaml
-#
-# k8s_yaml(['k8s/deployment.yaml', 'k8s/service.yaml'])
+# k8s_yaml('./infra/development/k8s/trip-service-deployment.yaml')
+# k8s_resource('trip-service', resource_deps=['trip-service-compile'], labels="services")
 
 
-# Customize a Kubernetes resource
-#   By default, Kubernetes resource names are automatically assigned
-#   based on objects in the YAML manifests, e.g. Deployment name.
-#
-#   Tilt strives for sane defaults, so calling k8s_resource is
-#   optional, and you only need to pass the arguments you want to
-#   override.
-#
-#   More info: https://docs.tilt.dev/api.html#api.k8s_resource
-#
-# k8s_resource('my-deployment',
-#              # map one or more local ports to ports on your Pod
-#              port_forwards=['5000:8080'],
-#              # change whether the resource is started by default
-#              auto_init=False,
-#              # control whether the resource automatically updates
-#              trigger_mode=TRIGGER_MODE_MANUAL
-# )
-
-
-# Run local commands
-#   Local commands can be helpful for one-time tasks like installing
-#   project prerequisites. They can also manage long-lived processes
-#   for non-containerized services or dependencies.
-#
-#   More info: https://docs.tilt.dev/local_resource.html
-#
-# local_resource('install-helm',
-#                cmd='which helm > /dev/null || brew install helm',
-#                # `cmd_bat`, when present, is used instead of `cmd` on Windows.
-#                cmd_bat=[
-#                    'powershell.exe',
-#                    '-Noninteractive',
-#                    '-Command',
-#                    '& {if (!(Get-Command helm -ErrorAction SilentlyContinue)) {scoop install helm}}'
-#                ]
-# )
-
-
-# Extensions are open-source, pre-packaged functions that extend Tilt
-#
-#   More info: https://github.com/tilt-dev/tilt-extensions
-#
-load('ext://git_resource', 'git_checkout')
-
-
-# Organize logic into functions
-#   Tiltfiles are written in Starlark, a Python-inspired language, so
-#   you can use functions, conditionals, loops, and more.
-#
-#   More info: https://docs.tilt.dev/tiltfile_concepts.html
-#
-def tilt_demo():
-    # Tilt provides many useful portable built-ins
-    # https://docs.tilt.dev/api.html#modules.os.path.exists
-    if os.path.exists('tilt-avatars/Tiltfile'):
-        # It's possible to load other Tiltfiles to further organize
-        # your logic in large projects
-        # https://docs.tilt.dev/multiple_repos.html
-        load_dynamic('tilt-avatars/Tiltfile')
-    watch_file('tilt-avatars/Tiltfile')
-    git_checkout('https://github.com/tilt-dev/tilt-avatars.git',
-                 checkout_dir='tilt-avatars')
-
-
-# Edit your Tiltfile without restarting Tilt
-#   While running `tilt up`, Tilt watches the Tiltfile on disk and
-#   automatically re-evaluates it on change.
-#
-#   To see it in action, try uncommenting the following line with
-#   Tilt running.
-# tilt_demo()
