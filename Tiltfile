@@ -44,7 +44,6 @@ k8s_resource('api-gateway', port_forwards=8081,
 
 ### CloudNativePG Operator ###
 load('ext://helm_remote', 'helm_remote')
-
 helm_remote(
   'cloudnative-pg',
   repo_name='cnpg',
@@ -55,7 +54,7 @@ helm_remote(
   set=[
     'webhook.mutating.failurePolicy=Ignore',
     'webhook.validating.failurePolicy=Ignore',
-  ]
+  ],
 )
 ### End of CloudNativePG Operator ###
 
@@ -65,6 +64,7 @@ k8s_resource(
   new_name='oms-db',
   objects=['oms-db:cluster'],       
   resource_deps=['cloudnative-pg'],      
+  labels="databases"
 )
 ### End of Postgres ###
 
