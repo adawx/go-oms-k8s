@@ -16,7 +16,24 @@ spec:
         - name: api-gateway
           image: go-oms/api-gateway
           ports:
-            - containerPort: 8081
+            - name: http
+              containerPort: 8081
+            # Metrics and health probes are served on a separate port so they
+            # are not reachable through the public LoadBalancer Service.
+            - name: admin
+              containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: admin
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: admin
+            initialDelaySeconds: 2
+            periodSeconds: 5
           resources:
             requests:
               memory: '128Mi'
@@ -25,11 +42,18 @@ spec:
               memory: '128Mi'
               cpu: '125m'
           env:
-            # Accessing an env variable from the app-config config map
-            - name: GATEWAY_HTTP_ADDR
+            # The service reads HTTP_ADDR; the config map names the key
+            # GATEWAY_HTTP_ADDR so each service can carry its own listen
+            # address in the shared map.
+            - name: HTTP_ADDR
               valueFrom:
                 configMapKeyRef:
                   key: GATEWAY_HTTP_ADDR
+                  name: app-config
+            - name: ADMIN_HTTP_ADDR
+              valueFrom:
+                configMapKeyRef:
+                  key: ADMIN_HTTP_ADDR
                   name: app-config
 ---
 apiVersion: v1

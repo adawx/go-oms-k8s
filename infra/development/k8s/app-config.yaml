@@ -5,3 +5,5 @@ metadata:
 data:
   ENVIRONMENT: 'development'
   GATEWAY_HTTP_ADDR: ':8081'
+  # Port carrying /metrics, /healthz and /readyz for every service.
+  ADMIN_HTTP_ADDR: ':9090'
