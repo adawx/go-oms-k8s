@@ -16,7 +16,24 @@ spec:
         - name: order-service
           image: go-oms/order-service
           ports:
-            - containerPort: 8085
+            - name: http
+              containerPort: 8085
+            - name: admin
+              containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: admin
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            # Readiness checks the database, so the pod leaves the Service
+            # endpoints whenever Postgres is unreachable.
+            httpGet:
+              path: /readyz
+              port: admin
+            initialDelaySeconds: 2
+            periodSeconds: 5
           resources:
             requests:
               memory: '64Mi'
@@ -25,6 +42,11 @@ spec:
               memory: '128Mi'
               cpu: '200m'
           env:
+            - name: ADMIN_HTTP_ADDR
+              valueFrom:
+                configMapKeyRef:
+                  key: ADMIN_HTTP_ADDR
+                  name: app-config
             # DB_HOST points at the CNPG read/write Service (the primary).
             - name: DB_HOST
               value: oms-db-rw
